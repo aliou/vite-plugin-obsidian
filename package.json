@@ -2,6 +2,7 @@
   "name": "@aliou/vite-plugin-obsidian",
   "version": "0.1.0",
   "description": "Vite plugin for building Obsidian plugins",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
