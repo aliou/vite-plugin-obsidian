@@ -1,0 +1,54 @@
+{
+  "name": "@aliou/vite-plugin-obsidian",
+  "version": "0.1.0",
+  "description": "Vite plugin for building Obsidian plugins",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -noEmit && unbuild",
+    "typecheck": "tsc -noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "builtin-modules": "^3.3.0"
+  },
+  "peerDependencies": {
+    "vite": ">=5.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.5",
+    "@types/node": "^25.7.0",
+    "husky": "^9.1.7",
+    "typescript": "^5.7.3",
+    "unbuild": "^3.5.2",
+    "vite": "^7.1.10",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.15.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "funding": "https://github.com/sponsors/aliou",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aliou/vite-plugin-obsidian.git"
+  },
+  "homepage": "https://github.com/aliou/vite-plugin-obsidian#readme",
+  "bugs": "https://github.com/aliou/vite-plugin-obsidian/issues"
+}
