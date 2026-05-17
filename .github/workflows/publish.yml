@@ -63,8 +63,9 @@ jobs:
           let commit = fallback;
           if (releases.length === 1) {
             const { name, newVersion } = releases[0];
-            title = 'Updating ' + name + ' to version ' + newVersion;
-            commit = name + '@' + newVersion;
+            const releaseName = name + '@' + newVersion;
+            title = 'Updating ' + releaseName;
+            commit = releaseName;
           }
 
           fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=' + title + '\n');
@@ -81,6 +82,7 @@ jobs:
           publish: pnpm changeset publish
           title: ${{ steps.release-info.outputs.title || 'Updating @aliou/vite-plugin-obsidian' }}
           commit: ${{ steps.release-info.outputs.commit || '@aliou/vite-plugin-obsidian' }}
+          createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
