@@ -1,80 +1,13 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { Plugin, UserConfig } from "vite";
+import type { ConfigEnv, Plugin, UserConfig } from "vite";
 import { createExternalMatcher } from "./external";
-import type { ObsidianManifest } from "./manifest";
+import type { ObsidianManifest, ObsidianManifestExport } from "./manifest";
 import type { ObsidianPluginOptions } from "./options";
 
-/**
- * Load package.json from the given path, or cwd as fallback.
- */
-function loadPackageJson(path?: string): Record<string, unknown> {
-  const target = path || join(process.cwd(), "package.json");
-  return JSON.parse(readFileSync(target, "utf8")) as Record<string, unknown>;
-}
-
-/**
- * Derive a plugin ID from a package name (strip scope).
- */
-function stripScope(name: string): string {
-  return name.replace(/^@[^/]+[/]/, "");
-}
-
-/**
- * Resolve the manifest config export from a `.ts` or `.js` file.
- *
- * We use Vite's own `ssrLoadModule` during dev / build so the user
- * can write their manifest config in TypeScript without pre-compiling.
- * Falls back to a direct `import()` when called outside a Vite context.
- */
-async function loadManifestConfig(
-  path: string,
-): Promise<ObsidianManifest | undefined> {
-  // We'll use dynamic import for .js files and Vite's SSR loading for .ts files
-  // But since this runs inside a Vite plugin hook, we use dynamic import directly
-  // Vite handles .ts files through its own pipeline during build.
-  try {
-    // For .ts files during build, Vite can handle them via ssrLoadModule
-    // But for simplicity and reliability, we'll just import directly
-    const mod = await import(path);
-    const config = mod.default ?? mod;
-    return typeof config === "object" ? config : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Build an `ObsidianManifest` from `package.json` fields.
- */
-function manifestFromPackageJson(
-  pkg: Record<string, unknown>,
-  overrides?: Partial<ObsidianManifest>,
-): ObsidianManifest {
-  const pkgName = (pkg.name as string) || "obsidian-plugin";
-  const manifest: ObsidianManifest = {
-    id: overrides?.id || stripScope(pkgName),
-    name: overrides?.name || pkgName,
-    version: (pkg.version as string) || "0.0.0",
-    minAppVersion: overrides?.minAppVersion || "0.15.0",
-    description: (pkg.description as string) || "",
-    author:
-      overrides?.author ||
-      (typeof pkg.author === "string" ? pkg.author : "") ||
-      "",
-    isDesktopOnly: overrides?.isDesktopOnly ?? false,
-  };
-
-  const authorUrl =
-    overrides?.authorUrl ||
-    (pkg.authorUrl as string) ||
-    (pkg.homepage as string) ||
-    "";
-  if (authorUrl) {
-    manifest.authorUrl = authorUrl;
-  }
-
-  return manifest;
+async function resolveManifest(
+  manifest: ObsidianManifestExport,
+  env: ConfigEnv,
+): Promise<ObsidianManifest> {
+  return typeof manifest === "function" ? manifest(env) : manifest;
 }
 
 /**
@@ -83,7 +16,7 @@ function manifestFromPackageJson(
  * Handles:
  * - Library mode with CommonJS output (Obsidian requires CJS)
  * - Externalizing obsidian, electron, codemirror, and Node builtins
- * - Auto-generating `manifest.json` from `manifest.config.ts` or `package.json`
+ * - Auto-generating `manifest.json` from the `manifest` option
  * - Extracting CSS to `styles.css`
  *
  * @example
@@ -94,7 +27,7 @@ function manifestFromPackageJson(
  * import { defineConfig } from "vite";
  *
  * export default defineConfig({
- *   plugins: [obsidian()],
+ *   plugins: [obsidian({ manifest })],
  * });
  * ```
  *
@@ -112,18 +45,19 @@ function manifestFromPackageJson(
  * });
  * ```
  */
-export function obsidian(options: ObsidianPluginOptions = {}): Plugin {
+export function obsidian(options: ObsidianPluginOptions): Plugin {
   const entry = options.entry || "main.ts";
   const outDir = options.outDir || "dist";
   const cssFileName = options.cssFileName || "styles.css";
   const minify = options.minify ?? false;
   const sourcemap = options.sourcemap ?? "inline";
-  const manifestConfigPath = options.manifestConfigPath;
+  let configEnv: ConfigEnv | undefined;
 
   return {
     name: "obsidian",
     apply: "build",
-    async config(): Promise<UserConfig> {
+    async config(_config, env): Promise<UserConfig> {
+      configEnv = env;
       return {
         build: {
           lib: {
@@ -151,28 +85,15 @@ export function obsidian(options: ObsidianPluginOptions = {}): Plugin {
       };
     },
     async generateBundle() {
-      let manifest: ObsidianManifest;
-
-      if (manifestConfigPath) {
-        const configManifest = await loadManifestConfig(manifestConfigPath);
-        if (!configManifest) {
-          throw new Error(
-            `@aliou/vite-plugin-obsidian: could not load manifest config from "${manifestConfigPath}".`,
-          );
-        }
-        manifest = configManifest;
-      } else {
-        let pkg: Record<string, unknown>;
-        try {
-          pkg = loadPackageJson();
-        } catch {
-          throw new Error(
-            "@aliou/vite-plugin-obsidian: could not find package.json. " +
-              "Create a manifest.config.ts or run from a project root.",
-          );
-        }
-        manifest = manifestFromPackageJson(pkg);
-      }
+      const manifest = await resolveManifest(
+        options.manifest,
+        configEnv ?? {
+          command: "build",
+          mode: "production",
+          isSsrBuild: false,
+          isPreview: false,
+        },
+      );
 
       this.emitFile({
         type: "asset",

@@ -1,3 +1,5 @@
+import type { ConfigEnv } from "vite";
+
 /**
  * Represents an Obsidian plugin manifest.
  *
@@ -24,11 +26,19 @@ export interface ObsidianManifest {
   isDesktopOnly?: boolean;
 }
 
+export type ObsidianManifestFn = (
+  env: ConfigEnv,
+) => ObsidianManifest | Promise<ObsidianManifest>;
+export type ObsidianManifestExport =
+  | ObsidianManifest
+  | Promise<ObsidianManifest>
+  | ObsidianManifestFn;
+
 /**
  * Define an Obsidian plugin manifest in a `manifest.config.ts` file.
  *
- * This is the type-safe way to declare your manifest. The plugin reads
- * this file at build time and uses it to generate `manifest.json`.
+ * This mirrors `@crxjs/vite-plugin`: pass the exported value to the
+ * `manifest` plugin option.
  *
  * @example
  * ```ts
@@ -45,7 +55,9 @@ export interface ObsidianManifest {
  * });
  * ```
  */
-export function defineManifest(manifest: ObsidianManifest): ObsidianManifest {
+export function defineManifest(
+  manifest: ObsidianManifestExport,
+): ObsidianManifestExport {
   return manifest;
 }
 

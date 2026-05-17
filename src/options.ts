@@ -1,5 +1,11 @@
+import type { ObsidianManifestExport } from "./manifest";
+
 /** Options for the Obsidian Vite plugin. */
 export interface ObsidianPluginOptions {
+  /**
+   * Obsidian manifest object, promise, or env callback.
+   */
+  manifest: ObsidianManifestExport;
   /**
    * Entrypoint for the plugin. Defaults to `"main.ts"`.
    */
@@ -26,10 +32,4 @@ export interface ObsidianPluginOptions {
    * builtins are already included.
    */
   external?: string[];
-  /**
-   * Path to `manifest.config.ts` (or `.js`). When set, the plugin reads
-   * the manifest from this file instead of requiring inline options.
-   * If omitted, the plugin falls back to reading from `package.json`.
-   */
-  manifestConfigPath?: string;
 }
