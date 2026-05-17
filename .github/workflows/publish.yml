@@ -51,28 +51,41 @@ jobs:
       - name: Get release info
         id: release-info
         run: |
-          pnpm changeset status --output=release.json 2>/dev/null || echo '{"releases":[]}' > release.json
-          node <<NODE
+          node <<'NODE'
           const fs = require('fs');
+          const path = require('path');
           const pkg = require('./package.json');
-          const release = JSON.parse(fs.readFileSync('release.json', 'utf8'));
-          const releases = release.releases?.filter(r => r.type !== 'none') || [];
 
-          const fallback = pkg.name + '@' + pkg.version;
-          let title = 'Updating ' + fallback;
-          let commit = fallback;
-          if (releases.length === 1) {
-            const { name, newVersion } = releases[0];
-            const releaseName = name + '@' + newVersion;
-            title = 'Updating ' + releaseName;
-            commit = releaseName;
+          const bumps = { patch: 0, minor: 1, major: 2 };
+          const changesetDir = '.changeset';
+          const changesets = fs.existsSync(changesetDir)
+            ? fs.readdirSync(changesetDir).filter((file) => file.endsWith('.md'))
+            : [];
+
+          let bump = undefined;
+          for (const file of changesets) {
+            const text = fs.readFileSync(path.join(changesetDir, file), 'utf8');
+            const match = text.match(new RegExp(`^["']?${pkg.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?:\\s*(patch|minor|major)`, 'm'));
+            if (!match) continue;
+            if (!bump || bumps[match[1]] > bumps[bump]) bump = match[1];
           }
 
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=' + title + '\n');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'commit=' + commit + '\n');
+          const version = pkg.version.split('.').map(Number);
+          if (bump === 'major') {
+            version[0] += 1;
+            version[1] = 0;
+            version[2] = 0;
+          } else if (bump === 'minor') {
+            version[1] += 1;
+            version[2] = 0;
+          } else if (bump === 'patch') {
+            version[2] += 1;
+          }
+
+          const releaseName = pkg.name + '@' + version.join('.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=Updating ' + releaseName + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'commit=' + releaseName + '\n');
           NODE
-          rm -f release.json
-        continue-on-error: true
 
       - name: Create Release PR or Publish
         id: changesets
@@ -86,6 +99,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+      - name: Update release PR title
+        if: steps.changesets.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.release-info.outputs.title }}
+        run: |
+          PR=$(gh pr list --head changeset-release/main --state open --json number --jq '.[0].number')
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --title "$TITLE"
+          fi
 
       - name: Create GitHub release
         if: steps.changesets.outputs.published == 'true'
