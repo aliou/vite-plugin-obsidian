@@ -2,22 +2,23 @@ name: Publish
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: ["CI"]
     types: [completed]
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   publish:
     name: Publish
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
       pull-requests: write
       id-token: write
 
@@ -25,11 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -37,9 +37,9 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
           scope: "@aliou"
-          cache: pnpm
+          cache: "pnpm"
 
-      - name: Upgrade npm for OIDC support
+      - name: Upgrade npm for stage publish support
         run: npm install -g npm@latest
 
       - name: Install dependencies
@@ -51,74 +51,72 @@ jobs:
       - name: Get release info
         id: release-info
         run: |
-          node <<'NODE'
+          pnpm changeset status --output=release.json 2>/dev/null || echo '{"releases":[]}' > release.json
+          node <<NODE
           const fs = require('fs');
-          const path = require('path');
-          const pkg = require('./package.json');
+          const release = JSON.parse(fs.readFileSync('release.json', 'utf8'));
+          const releases = release.releases?.filter(r => r.type !== 'none') || [];
 
-          const bumps = { patch: 0, minor: 1, major: 2 };
-          const changesetDir = '.changeset';
-          const changesets = fs.existsSync(changesetDir)
-            ? fs.readdirSync(changesetDir).filter((file) => file.endsWith('.md'))
-            : [];
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const packageName = pkg.name || 'unknown-package';
+          const fallbackVersion = pkg.version || '0.0.0';
 
-          let bump = undefined;
-          for (const file of changesets) {
-            const text = fs.readFileSync(path.join(changesetDir, file), 'utf8');
-            const match = text.match(new RegExp(`^["']?${pkg.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?:\\s*(patch|minor|major)`, 'm'));
-            if (!match) continue;
-            if (!bump || bumps[match[1]] > bumps[bump]) bump = match[1];
+          let title = 'Updating ' + packageName + ' to version ' + fallbackVersion;
+          let commit = packageName + '@' + fallbackVersion;
+          if (releases.length === 1) {
+            const { name, newVersion } = releases[0];
+            title = 'Updating ' + name + ' to version ' + newVersion;
+            commit = name + '@' + newVersion;
+          } else if (releases.length > 1) {
+            const summary = releases.map(r => r.name + '@' + r.newVersion).join(', ');
+            title = 'Updating ' + summary;
+            commit = summary;
           }
 
-          const version = pkg.version.split('.').map(Number);
-          if (bump === 'major') {
-            version[0] += 1;
-            version[1] = 0;
-            version[2] = 0;
-          } else if (bump === 'minor') {
-            version[1] += 1;
-            version[2] = 0;
-          } else if (bump === 'patch') {
-            version[2] += 1;
-          }
-
-          const releaseName = pkg.name + '@' + version.join('.');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=Updating ' + releaseName + '\n');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'commit=' + releaseName + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=' + title + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'commit=' + commit + '\n');
           NODE
+          rm -f release.json
+        continue-on-error: true
 
-      - name: Create Release PR or Publish
+      - name: Create Release PR or Stage
         id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          publish: pnpm changeset publish
-          title: ${{ steps.release-info.outputs.title || 'Updating @aliou/vite-plugin-obsidian' }}
-          commit: ${{ steps.release-info.outputs.commit || '@aliou/vite-plugin-obsidian' }}
-          createGithubReleases: false
+          title: ${{ steps.release-info.outputs.title }}
+          commit: ${{ steps.release-info.outputs.commit }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
 
-      - name: Update release PR title
-        if: steps.changesets.outputs.published != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TITLE: ${{ steps.release-info.outputs.title }}
-        run: |
-          PR=$(gh pr list --head changeset-release/main --state open --json number --jq '.[0].number')
-          if [ -n "$PR" ]; then
-            gh pr edit "$PR" --title "$TITLE"
-          fi
-
-      - name: Create GitHub release
-        if: steps.changesets.outputs.published == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Check for unpublished packages
+        id: check-publish
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="$PACKAGE_NAME@$VERSION"
-          if ! gh release view "$TAG" &>/dev/null; then
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          REGISTRY_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL_VERSION" != "$REGISTRY_VERSION" ]; then
+            echo "needs_staging=true" >> "$GITHUB_OUTPUT"
+            echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_staging=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stage packages
+        if: steps.check-publish.outputs.needs_staging == 'true'
+        run: npm stage publish
+        env:
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Create GitHub releases
+        if: steps.check-publish.outputs.needs_staging == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.check-publish.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "$TAG" --notes "Release $TAG"
           fi
