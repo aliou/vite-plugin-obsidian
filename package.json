@@ -27,6 +27,9 @@
     "version": "pnpm exec changeset version",
     "prepare": "husky"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "builtin-modules": "^3.3.0"
   },
@@ -43,7 +46,7 @@
     "vite": "^7.1.10",
     "vitest": "^3.2.4"
   },
-  "packageManager": "pnpm@10.15.0",
+  "packageManager": "pnpm@11.28.5",
   "publishConfig": {
     "access": "public"
   },
