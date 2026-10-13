@@ -1,3 +1,4 @@
+import type { ConfigEnv } from "vite";
 import { describe, expect, it } from "vitest";
 import type { ObsidianManifest } from "./manifest";
 import { obsidian } from "./plugin";
@@ -11,14 +12,23 @@ const testManifest: ObsidianManifest = {
   author: "Test Author",
 };
 
+const buildEnv: ConfigEnv = {
+  command: "build",
+  mode: "production",
+  isSsrBuild: false,
+  isPreview: false,
+};
+
 // We test the plugin by calling its hooks directly.
 // The `config` hook returns a partial Vite config, and `generateBundle`
 // emits a manifest.json asset.
 
 function callConfigHook(plugin: ReturnType<typeof obsidian>) {
-  return (plugin.config as (...args: unknown[]) => unknown).call(
-    plugin,
-  ) as Promise<{
+  const config = plugin.config as (
+    config: unknown,
+    env: ConfigEnv,
+  ) => Promise<unknown>;
+  return config.call(plugin, {}, buildEnv) as Promise<{
     build: {
       lib: {
         entry: string;
@@ -143,6 +153,16 @@ describe("obsidian plugin", () => {
       const emitted = await callGenerateBundleHook(plugin);
 
       expect(JSON.parse(emitted[0].source).id).toBe("test-plugin-production");
+    });
+
+    it("rejects manifest functions when config has not run", async () => {
+      const plugin = obsidian({
+        manifest: (env) => ({ ...testManifest, id: env.mode }),
+      });
+
+      await expect(callGenerateBundleHook(plugin)).rejects.toThrow(
+        /config hook/,
+      );
     });
   });
 });

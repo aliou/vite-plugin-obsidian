@@ -3,11 +3,27 @@ import { createExternalMatcher } from "./external";
 import type { ObsidianManifest, ObsidianManifestExport } from "./manifest";
 import type { ObsidianPluginOptions } from "./options";
 
+function resolveOptions(options: ObsidianPluginOptions) {
+  return {
+    entry: options.entry || "main.ts",
+    outDir: options.outDir || "dist",
+    cssFileName: options.cssFileName || "styles.css",
+    minify: options.minify ?? false,
+    sourcemap: options.sourcemap ?? "inline",
+  };
+}
+
 async function resolveManifest(
   manifest: ObsidianManifestExport,
-  env: ConfigEnv,
+  env: ConfigEnv | undefined,
 ): Promise<ObsidianManifest> {
-  return typeof manifest === "function" ? manifest(env) : manifest;
+  if (typeof manifest !== "function") return manifest;
+  if (!env) {
+    throw new Error(
+      "The manifest function needs the build environment from the config hook. Run the plugin through Vite so config runs before generateBundle.",
+    );
+  }
+  return manifest(env);
 }
 
 /**
@@ -46,11 +62,8 @@ async function resolveManifest(
  * ```
  */
 export function obsidian(options: ObsidianPluginOptions): Plugin {
-  const entry = options.entry || "main.ts";
-  const outDir = options.outDir || "dist";
-  const cssFileName = options.cssFileName || "styles.css";
-  const minify = options.minify ?? false;
-  const sourcemap = options.sourcemap ?? "inline";
+  const { entry, outDir, cssFileName, minify, sourcemap } =
+    resolveOptions(options);
   let configEnv: ConfigEnv | undefined;
 
   return {
@@ -85,15 +98,7 @@ export function obsidian(options: ObsidianPluginOptions): Plugin {
       };
     },
     async generateBundle() {
-      const manifest = await resolveManifest(
-        options.manifest,
-        configEnv ?? {
-          command: "build",
-          mode: "production",
-          isSsrBuild: false,
-          isPreview: false,
-        },
-      );
+      const manifest = await resolveManifest(options.manifest, configEnv);
 
       this.emitFile({
         type: "asset",
