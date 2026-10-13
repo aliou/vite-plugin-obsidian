@@ -37,7 +37,8 @@
     "vite": ">=5.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.5",
+    "@aliou/biome-plugins": "^0.14.0",
+    "@biomejs/biome": "^2.5.15",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^24.19.2",
     "husky": "^9.1.7",
