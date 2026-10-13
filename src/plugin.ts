@@ -78,6 +78,7 @@ export function obsidian(options: ObsidianPluginOptions): Plugin {
             name: "main",
             fileName: () => "main.js",
             formats: ["cjs"],
+            cssFileName,
           },
           outDir,
           emptyOutDir: false,

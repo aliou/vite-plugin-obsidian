@@ -35,6 +35,7 @@ function callConfigHook(plugin: ReturnType<typeof obsidian>) {
         name: string;
         fileName: () => string;
         formats: string[];
+        cssFileName?: string;
       };
       outDir: string;
       sourcemap: string | false;
@@ -80,6 +81,15 @@ describe("obsidian plugin", () => {
       const plugin = obsidian({ manifest: testManifest });
       const config = await callConfigHook(plugin);
       expect(config.build.lib.entry).toBe("main.ts");
+    });
+
+    it("passes cssFileName to lib options", async () => {
+      const plugin = obsidian({
+        cssFileName: "custom.css",
+        manifest: testManifest,
+      });
+      const config = await callConfigHook(plugin);
+      expect(config.build.lib.cssFileName).toBe("custom.css");
     });
 
     it("uses custom entry", async () => {
