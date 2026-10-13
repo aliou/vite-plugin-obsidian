@@ -1,23 +1,15 @@
 import builtins from "builtin-modules";
 
 /**
- * Obsidian-relevant module prefixes that must be externalized.
+ * Obsidian runtime modules that must be externalized.
  */
-const OBSIDIAN_MODULES = [
-  "obsidian",
-  "electron",
-  "@codemirror/autocomplete",
-  "@codemirror/collab",
-  "@codemirror/commands",
-  "@codemirror/language",
-  "@codemirror/lint",
-  "@codemirror/search",
-  "@codemirror/state",
-  "@codemirror/view",
-  "@lezer/common",
-  "@lezer/highlight",
-  "@lezer/lr",
-];
+const OBSIDIAN_MODULES = ["obsidian", "electron"];
+
+/**
+ * Module prefixes that must be externalized. Obsidian embeds its own
+ * CodeMirror and Lezer installations.
+ */
+const EXTERNAL_PREFIXES = ["@codemirror/", "@lezer/"];
 
 /**
  * Create a function that checks whether a module ID should be externalized.
@@ -31,15 +23,12 @@ export function createExternalMatcher(
   const external = new Set([
     ...OBSIDIAN_MODULES,
     ...builtins,
-    ...builtins.map((m) => `node:${m}`),
     ...extraExternal,
   ]);
 
   return (id: string) => {
     if (external.has(id)) return true;
     if (id.startsWith("node:")) return true;
-    if (id.startsWith("@codemirror/")) return true;
-    if (id.startsWith("@lezer/")) return true;
-    return false;
+    return EXTERNAL_PREFIXES.some((prefix) => id.startsWith(prefix));
   };
 }
