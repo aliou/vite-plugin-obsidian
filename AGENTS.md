@@ -28,7 +28,7 @@ src/
   index.ts      # Public exports
 ```
 
-Tests are colocated as `src/*.test.ts` and call the plugin's hooks directly; `pnpm build` only builds this package, it never runs Vite against a fixture project.
+Tests are colocated as `src/*.test.ts`: unit tests call the plugin's hooks directly, and `plugin.build.test.ts` runs a real Vite build against a fixture project.
 
 ## Git hooks (lefthook)
 
