@@ -24,8 +24,7 @@
     "test:watch": "vitest",
     "lint": "biome check",
     "format": "biome check --write",
-    "version": "pnpm exec changeset version",
-    "prepare": "husky"
+    "version": "pnpm exec changeset version"
   },
   "engines": {
     "node": ">=24"
@@ -41,7 +40,7 @@
     "@biomejs/biome": "^2.5.15",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^24.19.2",
-    "husky": "^9.1.7",
+    "lefthook": "^2.2.1",
     "typescript": "^5.9.3",
     "unbuild": "^3.6.1",
     "vite": "^8.3.4",
