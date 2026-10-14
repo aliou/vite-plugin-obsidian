@@ -38,7 +38,7 @@ Tests are colocated as `src/*.test.ts`: unit tests call the plugin's hooks direc
 ## CI/CD
 
 - **CI**: push to `main` and pull requests. Runs lint, typecheck, test, build on Node 24.
-- **Publish**: on CI success on `main` (`.github/workflows/publish.yml`). With pending changesets it opens a "Version Packages" PR; merging that PR stages the release on npm (`npm stage publish`), then tags and creates a GitHub release from `CHANGELOG.md`.
+- **Publish**: on CI success on `main` (`.github/workflows/publish.yml`). With pending changesets it opens a release PR titled "Updating `<pkg>` to version `<x>`"; squash-merging it names the publish run in the Actions tab. Merging stages the release on npm (`npm stage publish`), then tags and creates a GitHub release from `CHANGELOG.md`.
 
 ## Publishing
 
@@ -48,7 +48,7 @@ Release workflow (using [changesets](https://github.com/changesets/changesets)):
 
 1. Make code changes and add a changeset: `pnpm changeset`
 2. Commit the changeset file with your code and push/merge to `main`
-3. The publish workflow opens a "Version Packages" PR that bumps the version and updates `CHANGELOG.md`
+3. The publish workflow opens a release PR titled "Updating `<pkg>` to version `<x>`" that bumps the version and updates `CHANGELOG.md`
 4. Merge that PR; the workflow stages the release on npm (`npm stage publish`). Promote the staged release on npmjs.com to complete publication.
 
 ## Docs

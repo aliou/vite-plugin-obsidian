@@ -1,4 +1,8 @@
 name: Publish
+# The release PR is titled "Updating <pkg> to version <x>"; squash-merging it
+# makes that the commit message on main, which becomes this workflow's
+# display name.
+run-name: ${{ github.event.workflow_run.head_commit.message || 'Publish' }}
 
 on:
   workflow_run:
