@@ -1,7 +1,14 @@
 import type { ConfigEnv, Plugin, UserConfig } from "vite";
+import { version as viteVersion } from "vite";
 import { createExternalMatcher } from "./external";
 import type { ObsidianManifest, ObsidianManifestExport } from "./manifest";
 import type { ObsidianPluginOptions } from "./options";
+
+// Rolldown (vite 8+) renamed output.inlineDynamicImports to
+// output.codeSplitting; both mean "emit a single chunk", which Obsidian
+// requires since it only loads main.js.
+const usesCodeSplittingOption =
+  Number.parseInt(viteVersion.split(".")[0], 10) >= 8;
 
 function resolveOptions(options: ObsidianPluginOptions) {
   return {
@@ -92,7 +99,9 @@ export function obsidian(options: ObsidianPluginOptions): Plugin {
                 obsidian: "obsidian",
               },
               assetFileNames: cssFileName,
-              inlineDynamicImports: true,
+              ...(usesCodeSplittingOption
+                ? { codeSplitting: false }
+                : { inlineDynamicImports: true }),
             },
           },
         },

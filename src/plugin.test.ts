@@ -1,7 +1,9 @@
-import type { ConfigEnv } from "vite";
+import { type ConfigEnv, version } from "vite";
 import { describe, expect, it } from "vitest";
 import type { ObsidianManifest } from "./manifest";
 import { obsidian } from "./plugin";
+
+const viteMajor = Number.parseInt(version.split(".")[0], 10);
 
 const testManifest: ObsidianManifest = {
   id: "test-plugin",
@@ -40,7 +42,13 @@ function callConfigHook(plugin: ReturnType<typeof obsidian>) {
       outDir: string;
       sourcemap: string | false;
       minify: boolean;
-      rollupOptions: { external: (id: string) => boolean };
+      rollupOptions: {
+        external: (id: string) => boolean;
+        output: {
+          inlineDynamicImports?: boolean;
+          codeSplitting?: boolean;
+        };
+      };
     };
   }>;
 }
@@ -129,6 +137,17 @@ describe("obsidian plugin", () => {
       expect(isExternal("obsidian")).toBe(true);
       expect(isExternal("fs")).toBe(true);
       expect(isExternal("my-module")).toBe(false);
+    });
+
+    it("inlines dynamic imports into a single chunk", async () => {
+      const plugin = obsidian({ manifest: testManifest });
+      const config = await callConfigHook(plugin);
+      const output = config.build.rollupOptions.output;
+      if (viteMajor >= 8) {
+        expect(output.codeSplitting).toBe(false);
+      } else {
+        expect(output.inlineDynamicImports).toBe(true);
+      }
     });
   });
 
