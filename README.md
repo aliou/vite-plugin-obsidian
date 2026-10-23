@@ -59,7 +59,7 @@ export default defineManifest((env) => ({
 - Sets Vite to library mode with CommonJS output (Obsidian loads plugins as CJS)
 - Externalizes `obsidian`, `electron`, all `@codemirror/*`, `@lezer/*`, and Node builtins
 - Auto-generates `manifest.json` from the `manifest` option
-- Extracts CSS to `styles.css`
+- Extracts CSS to `styles.css` (or `cssFileName`)
 
 ## Options
 
@@ -69,7 +69,7 @@ export interface ObsidianPluginOptions {
   entry?: string;                   // default: "main.ts"
   outDir?: string;                  // default: "dist"
   cssFileName?: string;             // default: "styles.css"
-  sourcemap?: "inline" | "hidden" | false;
+  sourcemap?: "inline" | "hidden" | false; // default: "inline"
   minify?: boolean;                 // default: false
   external?: string[];              // additional externals
 }
